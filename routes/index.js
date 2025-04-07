@@ -3,7 +3,7 @@ const router = express.Router();
 
 const guestRoutes = require('./guestRoutes');
 const adminRoutes = require('./adminRoutes');
-const lessorRoutes = require('./lessorRoutes');
+const ownerRoutes = require('./ownerRoutes');
 const bookingRoutes = require('./bookingRoutes');
 const roomRoutes = require('./roomRoutes');
 const discountRoutes = require('./discountRoutes');
@@ -12,7 +12,7 @@ const favoriteRoutes = require('./favoriteRoutes');
 
 router.use('/guest', guestRoutes);
 router.use('/admin', adminRoutes);
-router.use('/lessor', lessorRoutes);
+router.use('/owner', ownerRoutes);
 router.use('/booking', bookingRoutes);
 router.use('/room', roomRoutes);
 router.use('/discount', discountRoutes);

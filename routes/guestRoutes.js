@@ -14,5 +14,10 @@ router.get('/profile', verifyToken, (req, res) => {
       user: req.user
   });
 });
-
+router.post('/logout', guestController.guestLogout);
+router.get('/me', guestController.getCurrentGuest);
+router.get('/reviews', guestController.getGuestReviews);
+router.patch('/update-name', guestController.updateGuestName);
+router.patch('/update-phone', guestController.updateGuestPhone);
+router.patch('/update-email', guestController.updateGuestEmail);
 module.exports = router;

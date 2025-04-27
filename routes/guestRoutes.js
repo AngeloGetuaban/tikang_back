@@ -20,4 +20,7 @@ router.get('/reviews', guestController.getGuestReviews);
 router.patch('/update-name', guestController.updateGuestName);
 router.patch('/update-phone', guestController.updateGuestPhone);
 router.patch('/update-email', guestController.updateGuestEmail);
+router.patch('/update-password', guestController.updateGuestPassword);
+router.get('/no-reviews', guestController.getGuestUnreviewedBookings);
+router.get('/bookings', guestController.getGuestBookings);
 module.exports = router;

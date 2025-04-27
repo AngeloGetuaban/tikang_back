@@ -34,7 +34,7 @@ exports.guestLogin = async (req, res) => {
 
         // Non-expiring token
         const token = jwt.sign(
-            { userId: user.user_id, full_name: user.full_name ,email: user.email, userType: user.user_type },
+            { userId: user.user_id, full_name: user.full_name ,email: user.email, userType: user.user_type, emailVerify: user.email_verify },
             JWT_SECRET
         );
 
@@ -332,6 +332,155 @@ exports.updateGuestEmail = async (req, res) => {
     res.status(500).json({ message: 'Server error while updating email' });
   }
 };
+
+exports.updateGuestPassword = async (req, res) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Authorization token missing' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.userId;
+
+    const { password, confirmPassword } = req.body;
+
+    if (!password || !confirmPassword) {
+      return res.status(400).json({ message: 'Both password and confirmPassword are required' });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    // Fetch current hashed password
+    const result = await db.query(`SELECT password_hash FROM users WHERE user_id = $1`, [userId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const currentHash = result.rows[0].password_hash;
+
+    // Compare new password with current hashed password
+    const isSamePassword = await bcrypt.compare(password, currentHash);
+    if (isSamePassword) {
+      return res.status(400).json({ message: 'You cannot reuse your current password' });
+    }
+
+    // Hash and update if different
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await db.query(
+      `UPDATE users SET password_hash = $1 WHERE user_id = $2`,
+      [hashedPassword, userId]
+    );
+
+    res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Error updating password:', error);
+    res.status(500).json({ message: 'Server error while updating password' });
+  }
+};
+
+exports.getGuestUnreviewedBookings = async (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Authorization token missing' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.userId;
+
+    const result = await db.query(
+      `
+      SELECT 
+        b.*
+      FROM bookings b
+      LEFT JOIN reviews r ON b.booking_id = r.booking_id
+      WHERE b.user_id = $1
+        AND r.booking_id IS NULL
+        AND b.booking_status = 'completed'
+      ORDER BY b.check_in_date DESC
+      `,
+      [userId]
+    );
+
+    res.status(200).json({ bookings: result.rows });
+  } catch (error) {
+    console.error('Error fetching unreviewed bookings:', error);
+    res.status(500).json({ message: 'Server error while fetching unreviewed bookings' });
+  }
+};
+
+exports.getGuestBookings = async (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Authorization token missing' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.userId;
+
+    const result = await db.query(
+      `
+      SELECT 
+        b.booking_id,
+        b.check_in_date,
+        b.check_out_date,
+        b.num_adults,
+        b.num_children,
+        b.num_rooms,
+        b.stay_type,
+        b.total_price,  
+        b.payment_status,
+        b.booking_status,
+        b.cancelled_date,
+        p.title,
+        p.address,
+        p.thumbnail_url,
+        COALESCE(json_agg(
+          DISTINCT jsonb_build_object(
+            'room_name', r.room_name,
+            'room_type', r.room_type,
+            'price_per_night', r.price_per_night,
+            'room_images', r.room_images
+          )
+        ) FILTER (WHERE r.room_id IS NOT NULL), '[]') AS rooms
+      FROM bookings b
+      LEFT JOIN properties p ON b.property_id = p.property_id
+      LEFT JOIN LATERAL (
+        SELECT * FROM rooms
+        WHERE room_id = ANY(b.room_id)
+      ) r ON true
+      WHERE b.user_id = $1
+      GROUP BY b.booking_id, p.property_id
+      ORDER BY b.check_in_date DESC
+      `,
+      [userId]
+    );
+
+    res.status(200).json({ bookings: result.rows });
+  } catch (error) {
+    console.error('Error fetching user bookings:', error);
+    res.status(500).json({ message: 'Server error while fetching bookings' });
+  }
+};
+
+
+
+
+
 
   
   

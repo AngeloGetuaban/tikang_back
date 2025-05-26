@@ -5,8 +5,7 @@ const guestController = require('../controllers/guestController');
 const verifyToken = require('../middleware/authMiddleware');
 
 router.post('/login', guestController.guestLogin);
-router.post('/register', guestController.guestRegister); // 👈 Add this
-
+router.post('/register', guestController.registerGuest);
 router.get('/profile', verifyToken, (req, res) => {
   // Access req.user here (decoded from JWT)
   res.json({

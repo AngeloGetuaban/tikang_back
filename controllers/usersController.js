@@ -83,3 +83,11 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// if (wss && wss.clients) {
+//   wss.clients.forEach(client => {
+//     if (client.readyState === 1) {
+//       client.send(JSON.stringify({ type: 'new-booking' }));
+//     }
+//   });
+// }

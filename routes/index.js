@@ -25,4 +25,5 @@ router.use('/message', messageRoutes);
 router.use('/cash', cashRoutes);
 router.use('/properties', propertiesRoutes);
 router.use('/discounts', discountRoutes);
+
 module.exports = router;

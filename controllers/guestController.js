@@ -51,45 +51,98 @@ exports.guestLogin = async (req, res) => {
     }
 };
 // -------------------- Guest Registration --------------------
-exports.guestRegister = async (req, res) => {
-    const { name, email, phone, address, password, confirmPassword } = req.body;
+exports.registerGuest = async (req, res) => {
+  const {
+    firstName,
+    lastName,
+    email,
+    phone,
+    address,
+    city,
+    province,
+    country,
+    age,
+    password,
+    confirmPassword
+  } = req.body;
 
-    if (!name || !email || !phone || !address || !password || !confirmPassword) {
-        return res.status(400).json({ message: 'All fields are required' });
+  // Validate required fields
+  if (!firstName || !lastName || !email || !phone || !address || !city || !province || !country || !age || !password || !confirmPassword) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ message: 'Passwords do not match' });
+  }
+
+  try {
+    // Check if email is already used by another guest
+    const existingEmail = await db.query(
+      `SELECT user_id FROM users WHERE email = $1 AND user_type = 'guest'`,
+      [email]
+    );
+
+    if (existingEmail.rows.length > 0) {
+      return res.status(409).json({ message: 'Email is already used by another guest' });
     }
 
-    if (password !== confirmPassword) {
-        return res.status(400).json({ message: 'Passwords do not match' });
+    // Check if phone number is already used by another guest
+    const existingPhone = await db.query(
+      `SELECT user_id FROM users WHERE phone = $1 AND user_type = 'guest'`,
+      [phone]
+    );
+
+    if (existingPhone.rows.length > 0) {
+      return res.status(409).json({ message: 'Phone number is already used by another guest' });
     }
 
-    try {
-        const existing = await db.query('SELECT user_id FROM users WHERE email = $1', [email]);
-        if (existing.rows.length > 0) {
-            return res.status(409).json({ message: 'Email already registered' });
-        }
+    const fullName = `${firstName} ${lastName}`;
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await db.query(
+      `INSERT INTO users (
+        first_name, last_name, full_name, email, password_hash, phone, address, city, province, country, age, profile_picture, user_type
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULL, 'guest'
+      ) RETURNING user_id, full_name, email, user_type, email_verify, address, city, province, country, age`,
+      [firstName, lastName, fullName, email, hashedPassword, phone, address, city, province, country, age]
+    );
 
-        const result = await db.query(
-            `INSERT INTO users (full_name, email, password_hash, phone, address, profile_picture, user_type)
-             VALUES ($1, $2, $3, $4, $5, NULL, 'guest')
-             RETURNING user_id, full_name, email, user_type`,
-            [name, email, hashedPassword, phone, address]
-        );
+    const user = result.rows[0];
 
-        const newUser = result.rows[0];
+    const token = jwt.sign(
+      {
+        userId: user.user_id,
+        full_name: user.full_name,
+        email: user.email,
+        userType: user.user_type,
+        emailVerify: user.email_verify,
+        address: user.address,
+        city: user.city,
+        province: user.province,
+        country: user.country,
+        age: user.age
+      },
+      JWT_SECRET
+    );
 
-        const token = jwt.sign(
-            { userId: newUser.user_id, full_name: newUser.name, email: newUser.email, userType: newUser.user_type },
-            JWT_SECRET
-        );
+    await db.query(
+      `INSERT INTO user_sessions (user_id, token) VALUES ($1, $2)`,
+      [user.user_id, token]
+    );
 
-        res.status(201).json({ message: 'Registration successful', token });
-    } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
+    res.status(201).json({ message: 'Registration successful', token });
+
+  } catch (err) {
+    console.error('registerOwner error:', err);
+    res.status(500).json({ message: 'Server error during registration' });
+  }
 };
+
+
+
+
+
 
 exports.getCurrentGuest = async (req, res) => {
     const authHeader = req.headers.authorization;
